@@ -211,6 +211,15 @@ fn select_name() -> String {
         .unwrap()
 }
 
+fn select_group(default_group: String) -> String {
+    Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Task group:")
+        .show_default(true)
+        .default(default_group)
+        .interact_on(&Term::stdout())
+        .unwrap()
+}
+
 fn select_num_tests() -> usize {
     Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Num sample tests:")
@@ -234,7 +243,7 @@ const INPUT_OPTIONS: [&str; 2] = ["Stdin", "File"];
 
 fn select_input_type() -> IOType {
     let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select option:")
+        .with_prompt("Select input option:")
         .default(0)
         .items(&INPUT_OPTIONS)
         .interact_on(&Term::stdout())
@@ -263,7 +272,7 @@ const OUTPUT_OPTIONS: [&str; 2] = ["Stdout", "File"];
 
 fn select_output_type() -> IOType {
     let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select option:")
+        .with_prompt("Select output option:")
         .default(0)
         .items(&OUTPUT_OPTIONS)
         .interact_on(&Term::stdout())
@@ -288,9 +297,8 @@ fn select_output_type() -> IOType {
     }
 }
 
-pub fn create_task_wizard() {
-    let name = select_name();
-    let task = Task {
+fn create_simple_task(name: String) -> Task {
+    Task {
         name: name.clone(),
         group: "Manual".to_string(),
         url: "".to_string(),
@@ -301,16 +309,56 @@ pub fn create_task_wizard() {
                 input: "".to_string(),
                 output: "".to_string()
             };
-            select_num_tests()
+            2
         ],
-        test_type: select_test_type(),
-        input: select_input_type(),
-        output: select_output_type(),
+        test_type: TestType::Single,
+        input: IOType {
+            io_type: IOEnum::StdIn,
+            file_name: None,
+            pattern: None,
+        },
+        output: IOType {
+            io_type: IOEnum::StdOut,
+            file_name: None,
+            pattern: None,
+        },
         languages: Languages {
             java: TaskClass {
                 task_class: name.replace(' ', ""),
             },
         },
-    };
+    }
+}
+
+pub fn create_task_wizard() {
+    let name = select_name();
+    let mut task = create_simple_task(name.clone());
+
+    // custom setup based on detected custom name format
+    if name.contains("advent-of-code") {
+        // in format of "advent-of-code-<date(YYMMDD)>-<a|b>"
+        // e.g. "advent-of-code-241208-a"
+        let aoc_date = &name[15..21];
+        let aoc_year = format!("20{}", &aoc_date[..2]);
+        let aoc_day = aoc_date[4..].parse::<u32>().unwrap();
+        task.group = format!("Advent of Code {}", aoc_date).to_string();
+        task.url = format!("https://adventofcode.com/{}/day/{}", aoc_year, aoc_day)
+    } else if name.contains("leetcode") {
+        task.group = "Leetcode".to_string();
+        task.tests.pop(); // from 2, pop to just 1 test (otherwise it won't run)
+    } else {
+        task.group = select_group("Manual".to_string());
+        task.tests = vec![
+            Test {
+                input: "".to_string(),
+                output: "".to_string()
+            };
+            select_num_tests()
+        ];
+        task.test_type = select_test_type();
+        task.input = select_input_type();
+        task.output = select_output_type();
+    }
+
     create(task);
 }

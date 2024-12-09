@@ -64,27 +64,39 @@ fn find_additional_solution_files(task_name: &str) -> Vec<String> {
         .collect()
 }
 
+fn get_archive_path(task: Task) -> String {
+    if task.name.contains("advent-of-code") {
+        let aoc_date = &task.name[15..21];
+        let aoc_year = format!("20{}", &aoc_date[..2]);
+        format!(
+            "archive/advent_of_code/{}/{}",
+            aoc_year,
+            contest_name(&task.group),
+        )
+    } else {
+        let now = Utc::now();
+        format!(
+            "archive/{}/{:02}/{:02} - {}",
+            now.year(),
+            now.month(),
+            now.day(),
+            contest_name(&task.group),
+        )
+    }
+}
+
 fn ask_archive(task_name: String, selection: usize) {
     if selection == 0 {
         return;
     }
     if selection >= 2 {
-        let now = Utc::now();
         let mut main =
             rust_competitive_helper_util::read_lines(format!("tasks/{}/src/main.rs", task_name))
                 .unwrap();
         let task =
             serde_json::from_str::<Task>(main[0].chars().skip(2).collect::<String>().as_str())
                 .unwrap();
-        let path = format!(
-            "archive/{}/{:02}/{:02}.{:02}.{} - {}",
-            now.year(),
-            now.month(),
-            now.day(),
-            now.month(),
-            now.year(),
-            contest_name(&task.group),
-        );
+        let path = get_archive_path(task);
         let path = path.replace(':', "_");
         fs::create_dir_all(path.clone()).unwrap();
         rust_competitive_helper_util::write_lines(
